@@ -1,36 +1,80 @@
-// backend/routes/api/users.js
 const express = require('express');
-const bcrypt = require('bcryptjs');              // For password hashing
+const bcrypt = require('bcryptjs');  // For password hashing
+const { check } = require('express-validator');  // Import express-validator
+const { handleValidationErrors } = require('../../utils/validation');  // Import validation handler
 
-const { setTokenCookie, requireAuth } = require('../../utils/auth');  // Auth utilities
-const { User } = require('../../db/models');     // User model
+const { setTokenCookie } = require('../../utils/auth');  // Auth utilities
+const { User } = require('../../db/models');  // User model
 
 const router = express.Router();
 
-// Sign up
-router.post('/', async (req, res) => {           // POST /api/users endpoint
-  const { email, password, username } = req.body;  // Extract user data
+// **Signup Validation Middleware**
+const validateSignup = [
+  check('email')
+    .exists({ checkFalsy: true })         // Email must exist and not be falsy
+    .isEmail()                            // Must be a valid email format
+    .withMessage('Please provide a valid email.'),
   
-  // Hash the password
-  const hashedPassword = bcrypt.hashSync(password);  // Create secure hash
+  check('username')
+    .exists({ checkFalsy: true })         // Username must exist and not be falsy
+    .isLength({ min: 4 })                 // Must be at least 4 characters long
+    .withMessage('Please provide a username with at least 4 characters.'),
   
-  // Create a new user
-  const user = await User.create({ email, username, hashedPassword });  // Save to DB
+  check('username')
+    .not()                                // Username must NOT be an email
+    .isEmail()
+    .withMessage('Username cannot be an email.'),
+  
+  check('password')
+    .exists({ checkFalsy: true })         // Password must exist and not be falsy
+    .isLength({ min: 6 })                 // Password must be at least 6 characters long
+    .withMessage('Password must be 6 characters or more.'),
+  
+  handleValidationErrors  // Handle validation errors
+];
 
-  // Create a safe user object (without hashedPassword)
-  const safeUser = {
-    id: user.id,
-    email: user.email,
-    username: user.username,
-  };
+// **Sign up Route**
+router.post(
+  '/',
+  validateSignup,  // Apply validation middleware
+  async (req, res) => {  // Handle user signup
+    const { email, password, username } = req.body;  // Extract user data
 
-  // Set the JWT cookie
-  await setTokenCookie(res, safeUser);           // Login the new user automatically
+    // Check if the email or username already exists
+    const existingUser = await User.findOne({
+      where: {
+        [Op.or]: [{ email }, { username }]  // Search by email or username
+      }
+    });
 
-  // Return the user information
-  return res.json({
-    user: safeUser                              // Return user data
-  });
-});
+    if (existingUser) {
+      const err = new Error('User already exists');
+      err.status = 400;
+      err.errors = { email: 'Email or username is already in use.' };
+      return next(err);  // Return error if user already exists
+    }
+
+    // Hash the password
+    const hashedPassword = bcrypt.hashSync(password);  // Hash password securely
+
+    // Create a new user
+    const user = await User.create({ email, username, hashedPassword });
+
+    // Create a safe user object (without the password)
+    const safeUser = {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+    };
+
+    // Set the JWT cookie (log the user in immediately)
+    await setTokenCookie(res, safeUser);
+
+    // Return the new user's data
+    return res.json({
+      user: safeUser  // Send back safe user data
+    });
+  }
+);
 
 module.exports = router;
