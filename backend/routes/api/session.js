@@ -47,4 +47,19 @@ router.delete('/', (_req, res) => {
   return res.json({ message: 'success' });     
 });
 
+// Restore session user
+router.get('/', (req, res) => {                 // GET /api/session endpoint
+    const { user } = req;                         // Get user from request object
+    if (user) {
+      const safeUser = {                          // Create safe user object
+        id: user.id,
+        email: user.email,
+        username: user.username,
+      };
+      return res.json({
+        user: safeUser                           // Return user data if logged in
+      });
+    } else return res.json({ user: null });       // Return null if not logged in
+  });
+
 module.exports = router;
