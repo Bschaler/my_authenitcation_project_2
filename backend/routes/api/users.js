@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');  // For password hashing
 const { check } = require('express-validator');  // Import express-validator
 const { handleValidationErrors } = require('../../utils/validation');  // Import validation handler
+const { Op } = require('sequelize');  // Import Op for querying database
 
 const { setTokenCookie } = require('../../utils/auth');  // Auth utilities
 const { User } = require('../../db/models');  // User model
@@ -30,6 +31,14 @@ const validateSignup = [
     .isLength({ min: 6 })                 // Password must be at least 6 characters long
     .withMessage('Password must be 6 characters or more.'),
   
+  check('firstName')
+    .exists({ checkFalsy: true })         // First name must exist
+    .withMessage('Please provide your first name.'),
+
+  check('lastName')
+    .exists({ checkFalsy: true })         // Last name must exist
+    .withMessage('Please provide your last name.'),
+
   handleValidationErrors  // Handle validation errors
 ];
 
@@ -37,8 +46,8 @@ const validateSignup = [
 router.post(
   '/',
   validateSignup,  // Apply validation middleware
-  async (req, res) => {  // Handle user signup
-    const { email, password, username } = req.body;  // Extract user data
+  async (req, res, next) => {  // Handle user signup
+    const { email, password, username, firstName, lastName } = req.body;  // Extract user data
 
     // Check if the email or username already exists
     const existingUser = await User.findOne({
@@ -58,13 +67,21 @@ router.post(
     const hashedPassword = bcrypt.hashSync(password);  // Hash password securely
 
     // Create a new user
-    const user = await User.create({ email, username, hashedPassword });
+    const user = await User.create({ 
+      email, 
+      username, 
+      hashedPassword, 
+      firstName,  // Include firstName
+      lastName    // Include lastName
+    });
 
     // Create a safe user object (without the password)
     const safeUser = {
       id: user.id,
       email: user.email,
       username: user.username,
+      firstName: user.firstName,  // Include in response
+      lastName: user.lastName     // Include in response
     };
 
     // Set the JWT cookie (log the user in immediately)
