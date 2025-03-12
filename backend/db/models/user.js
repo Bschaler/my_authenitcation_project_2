@@ -6,7 +6,7 @@ const { Model, Validator } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
   class User extends Model {
     static associate(models) {
-      // define associations here
+      // define association here
     }
   }
 
@@ -17,8 +17,8 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         unique: true,
         validate: {
-          len: [4, 30], // username must be 4-30 characters
-          isNotEmail(value) { // custom validator to ensure it's not an email
+          len: [4, 30],
+          isNotEmail(value) {
             if (Validator.isEmail(value)) {
               throw new Error('Cannot be an email.');
             }
@@ -30,16 +30,24 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         unique: true,
         validate: {
-          len: [3, 256], // email must be 3-256 characters
-          isEmail: true, // must be a valid email format
+          len: [3, 256],
+          isEmail: true,
         },
       },
       hashedPassword: {
         type: DataTypes.STRING.BINARY,
         allowNull: false,
         validate: {
-          len: [60, 60], // bcrypt hashes are always 60 characters
+          len: [60, 60],
         },
+      },
+      firstName: {                             // Add firstName attribute
+        type: DataTypes.STRING,
+        allowNull: true,                      // Optional field
+      },
+      lastName: {                              // Add lastName attribute
+        type: DataTypes.STRING,
+        allowNull: true,                      // Optional field
       },
     },
     {
@@ -47,21 +55,10 @@ module.exports = (sequelize, DataTypes) => {
       modelName: 'User',
       defaultScope: {
         attributes: {
-          exclude: ['hashedPassword', 'email', 'createdAt', 'updatedAt'], // Exclude sensitive fields by default
-        },
-      },
-      scopes: {
-        // Named scope to exclude password
-        withoutPassword: {
-          attributes: { exclude: ['hashedPassword'] },
-        },
-        // Named scope to include all fields (for login or authentication)
-        loginUser: {
-          attributes: {}, // No exclusion, include all fields
+          exclude: ['hashedPassword', 'createdAt', 'updatedAt'],   // Exclude sensitive fields
         },
       },
     }
   );
-  
   return User;
 };
